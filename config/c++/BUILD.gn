@@ -23,7 +23,7 @@ config("runtime_library") {
   # buildtools/third_party/libc++/__config_site. This config only has defines
   # that vary depending on gn args, and non-define flags.
 
-  if (!libcxx_is_shared) {
+  if (!libcxx_is_shared && libcxx_base_path == "") {
     # Don't leak any symbols on a static build.
     defines += [ "_LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS" ]
     if (!export_libcxxabi_from_executables && !is_win) {
@@ -31,7 +31,9 @@ config("runtime_library") {
     }
   }
 
-  include_dirs += [ "//buildtools/third_party/libc++" ]
+  if (libcxx_base_path == "") {
+    include_dirs += [ "//buildtools/third_party/libc++" ]
+  }
 
   # libc++ has two levels of additional checking:
   # 1. _LIBCPP_ENABLE_ASSERTIONS enables assertions for bounds checking.
@@ -42,7 +44,9 @@ config("runtime_library") {
     defines += [ "_LIBCPP_ENABLE_DEBUG_MODE" ]
   }
 
-  defines += [ "CR_LIBCXX_REVISION=$libcxx_revision" ]
+  if (libcxx_base_path == "") {
+    defines += [ "CR_LIBCXX_REVISION=$libcxx_revision" ]
+  }
 
   if (is_win) {
     # Intentionally not using libc++abi on Windows because libc++abi only
@@ -52,22 +56,40 @@ config("runtime_library") {
     assert(!export_libcxxabi_from_executables,
            "Don't use libcxxabi on Windows.")
 
-    cflags_cc +=
-        [ "-I" + rebase_path("$libcxx_prefix/include", root_build_dir) ]
+    if (libcxx_base_path == "") {
+      cflags_cc +=
+          [ "-I" + rebase_path("$libcxx_prefix/include", root_build_dir) ]
+    } else {
+      cflags_cc += [ "-I" + "$libcxx_base_path/include/c++/v1" ]
+      ldflags += [ "/LIBPATH:" + "$libcxx_base_path/lib" ]
+      libs += [ "c++.lib" ]
+    }
 
     # Add a debug visualizer for Microsoft's debuggers so that they can display
     # libc++ types well.
-    if (libcxx_natvis_include) {
+    if (libcxx_natvis_include && libcxx_base_path == "") {
       # chrome.natvis listed as an input in //buildtools/third_party/libc++ to
       # guarantee relinking on changes.
       ldflags += [ "/NATVIS:" + rebase_path("libc++.natvis", root_build_dir) ]
     }
   } else {
-    cflags_cc += [
-      "-nostdinc++",
-      "-isystem" + rebase_path("$libcxx_prefix/include", root_build_dir),
-      "-isystem" + rebase_path("$libcxxabi_prefix/include", root_build_dir),
-    ]
+    if (libcxx_base_path == "") {
+      cflags_cc += [
+        "-nostdinc++",
+        "-isystem" + rebase_path("$libcxx_prefix/include", root_build_dir),
+        "-isystem" + rebase_path("$libcxxabi_prefix/include", root_build_dir),
+      ]
+    } else {
+      cflags_cc += [
+        "-nostdinc++",
+        "-isystem" + "$libcxx_base_path/include/c++/v1",
+      ]
+      ldflags += [
+        "-L" + "$libcxx_base_path/lib",
+        "-Wl,-rpath,$libcxx_base_path/lib",
+      ]
+      libs += [ "c++" ]
+    }
 
     cflags_objcc = cflags_cc
 

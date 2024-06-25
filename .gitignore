@@ -25,3 +25,4 @@ ciopfs
 /mac_files
 
 !/util/LASTCHANGE.dummy
+.DS_Store

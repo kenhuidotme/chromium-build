@@ -7,6 +7,11 @@ import("//build/config/sanitizers/sanitizers.gni")
 import("//build_overrides/build.gni")
 
 declare_args() {
+  # Use out-tree pre-built libc++
+  libcxx_base_path = ""
+}
+
+declare_args() {
   # Use in-tree libc++ (buildtools/third_party/libc++ and
   # buildtools/third_party/libc++abi) instead of the system C++ library for C++
   # standard library support.
@@ -68,7 +73,7 @@ use_safe_libcxx = (use_custom_libcxx && enable_safe_libcxx) || is_nacl_saigo
 # libraries on certain instrumented builds.
 export_libcxxabi_from_executables =
     use_custom_libcxx && !is_apple && !is_win && !is_component_build &&
-    (is_asan || is_ubsan_vptr)
+    libcxx_base_path == "" && (is_asan || is_ubsan_vptr)
 
 # On Android, many shared libraries get loaded from the context of a JRE.  In
 # this case, there's no "main executable" to export libc++abi from.  We could
